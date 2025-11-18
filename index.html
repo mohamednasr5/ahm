@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>كشوف الناخبين - لجنة 26 - مدرسة الأحمدية</title>
-
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.1/dist/tesseract.min.js"></script>
+
     <style>
         body {font-family: Arial, sans-serif; background:#f0f2f5; margin:0; padding:20px;}
         .container {max-width:1000px; margin:auto; background:white; padding:25px; border-radius:15px; box-shadow:0 6px 20px rgba(0,0,0,0.1);}
@@ -16,7 +16,7 @@
         textarea {width:100%; height:260px; padding:12px; font-size:16px; border-radius:8px; border:2px solid #ccc;}
 
         .search-box {width:100%; padding:16px; font-size:22px; border-radius:50px;
-            border:3px solid #1877f2; margin:20px 0; text-align:center;}
+            border:3px solid #1877f2; margin:20px 0 0 0; text-align:center;}
 
         .results {margin-top:20px; max-height:500px; overflow-y:auto;}
 
@@ -25,19 +25,15 @@
             margin:10px 0; cursor:pointer; transition:.25s; box-shadow:0 3px 10px rgba(0,0,0,0.08);
         }
         .voter-item:hover {background:#e8f5e8; transform:translateX(-6px);}
-
         .voter-name {font-size:20px; font-weight:bold;}
         .voter-serial {font-size:24px; font-weight:bold; color:#d32f2f;}
 
-        /* منطقة الكاميرا */
-        .camera-section {margin:20px 0; text-align:center;}
-        #videoPreview {width:100%; max-width:640px; border:3px solid #1877f2; border-radius:12px; display:none;}
-        #canvasOCR {display:none;}
-        .camera-controls {margin:15px 0;}
-        .camera-controls button {padding:12px 25px; margin:5px; border-radius:8px; border:none; color:white; font-size:16px; cursor:pointer;}
-        .btn-start {background:#4caf50;}
-        .btn-stop {background:#f44336;}
-        .ocr-status {margin:10px 0; padding:10px; background:#fff3cd; border-radius:8px; border:2px solid #ffc107; font-weight:bold;}
+        /* ميكروفون صوتي */
+        .mic-section {text-align:center; margin:0 0 14px 0;}
+        #micBtn {font-size:24px;border:none;border-radius:50%;background:#ffc107;color:#222;
+            padding:15px;cursor:pointer;transition:.25s;}
+        #micBtn.active {background:#ff9800;}
+        #micStatus {margin-right:12px;color:#888;font-size:18px;}
 
         /* البطاقة العائمة */
         .modal {display:none; position:fixed; left:0; top:0; width:100%; height:100%;
@@ -109,21 +105,13 @@
         </button>
     </div>
 
-    <!-- قسم الكاميرا المباشرة -->
-    <div class="camera-section">
-        <div class="camera-controls">
-            <button class="btn-start" onclick="startCamera()">تشغيل الكاميرا والسكان الفوري</button>
-            <button class="btn-stop" onclick="stopCamera()">إيقاف الكاميرا</button>
-        </div>
-        <div id="ocrStatus" class="ocr-status" style="display:none;">
-            جاري السكان المباشر... ضع البطاقة أمام الكاميرا
-        </div>
-        <video id="videoPreview" autoplay playsinline></video>
-        <canvas id="canvasOCR"></canvas>
+    <!-- زر ميكروفون صوتي -->
+    <div class="mic-section">
+        <button id="micBtn" title="بحث صوتي">🎤</button>
+        <span id="micStatus"></span>
     </div>
 
     <input type="text" id="searchBox" class="search-box" placeholder="ابحث بالاسم أو الرقم..." onkeyup="search()">
-
     <div id="results" class="results"></div>
 </div>
 
@@ -131,14 +119,10 @@
 <div id="modal" class="modal" onclick="this.style.display='none'">
     <div class="card" onclick="event.stopPropagation()">
         <div class="card-header">بطاقة الناخب</div>
-
         <div class="voter-fullname" id="mName"></div>
-
         <div class="big-serial" id="mSerial"></div>
-
         <div class="committee-box">رقم اللجنة: 26</div>
         <div class="place-box">مدرسة الأحمدية</div>
-
         <button class="print-btn" onclick="printCard()">طباعة</button>
     </div>
 </div>
@@ -155,10 +139,6 @@
 
 <script>
 let voters = [];
-let videoStream = null;
-let isScanning = false;
-let ocrWorker = null;
-let scanInterval = null;
 
 // تحويل الأرقام العربية للهندية
 function fixNumbers(str) {
@@ -189,15 +169,12 @@ function extractNumberName(line) {
 function loadData() {
     const text = document.getElementById("textInput").value.trim();
     if (!text) { alert("أدخل النص أولاً!"); return; }
-
     voters = [];
     const lines = text.split(/\n/);
-
     lines.forEach(line => {
         const recs = extractNumberName(line);
         if (recs.length) voters.push(...recs);
     });
-
     alert("تم تحميل " + voters.length + " ناخب.");
     search();
 }
@@ -207,11 +184,9 @@ function search() {
     let q = document.getElementById("searchBox").value.trim();
     let res = document.getElementById("results");
     res.innerHTML = "";
-
     const matched = voters.filter(v =>
         v.name.includes(q) || v.number.includes(q)
     );
-
     matched.forEach(v => {
         const div = document.createElement("div");
         div.className = "voter-item";
@@ -228,9 +203,7 @@ function search() {
 function showCard(v) {
     document.getElementById("mName").textContent = v.name;
     document.getElementById("mSerial").textContent = "رقم الكشف: " + v.number;
-
     document.getElementById("pSerialOnly").textContent = v.number;
-
     document.getElementById("modal").style.display = "flex";
 }
 
@@ -239,121 +212,48 @@ function printCard() {
     window.print();
 }
 
-// استخراج الرقم القومي والاسم من نص البطاقة
-function extractIDInfo(text) {
-    let idMatch = text.match(/(?:[12][0-9]{9}[0-9]{4})/);
-    let name = "";
-    let nameMatch = text.match(/الاسم[:\s]*([^\n\r]+)\n?/);
-    if (nameMatch && nameMatch[1].length > 7) name = nameMatch[1].trim();
-    if (!name && idMatch) {
-        let i = text.indexOf(idMatch[0]);
-        if (i > 0) {
-            let beforeID = text.slice(0, i).split('\n');
-            if (beforeID.length) name = beforeID[beforeID.length - 1].replace(/[^ \u0621-\u064a]/g, '').trim();
+/* البحث الصوتي */
+let recognition;
+let micActive = false;
+try {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'ar-EG';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+        micActive = true;
+        document.getElementById('micBtn').classList.add('active');
+        document.getElementById('micStatus').textContent = "يستمع...";
+    };
+    recognition.onresult = (event) => {
+        micActive = false;
+        document.getElementById('micBtn').classList.remove('active');
+        document.getElementById('micStatus').textContent = "";
+        if (event.results.length > 0) {
+            const text = event.results[0][0].transcript.trim();
+            document.getElementById('searchBox').value = text;
+            search();
         }
+    };
+    recognition.onend = () => {
+        micActive = false;
+        document.getElementById('micBtn').classList.remove('active');
+        document.getElementById('micStatus').textContent = "";
+    };
+    recognition.onerror = (e) => {
+        micActive = false;
+        document.getElementById('micBtn').classList.remove('active');
+        document.getElementById('micStatus').textContent = "لم تلتقط الصوت بشكل صحيح";
     }
-    return {id: idMatch ? idMatch[0] : "", name};
+
+    document.getElementById('micBtn').addEventListener('click', function() {
+        if (!micActive) recognition.start();
+    });
+} catch (e) {
+    document.getElementById('micStatus').textContent = "🎤 غير مدعوم في هذا المتصفح";
 }
-
-// تشغيل الكاميرا والسكان الفوري
-async function startCamera() {
-    try {
-        const video = document.getElementById('videoPreview');
-        const canvas = document.getElementById('canvasOCR');
-        const status = document.getElementById('ocrStatus');
-        
-        // إيقاف أي كاميرا سابقة
-        if (videoStream) {
-            stopCamera();
-        }
-
-        // طلب الوصول للكاميرا الخلفية
-        videoStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: "environment" } },
-            audio: false
-        });
-
-        video.srcObject = videoStream;
-        video.style.display = 'block';
-        status.style.display = 'block';
-        
-        // تهيئة Tesseract Worker
-        if (!ocrWorker) {
-            ocrWorker = await Tesseract.createWorker('ara');
-        }
-
-        isScanning = true;
-
-        // بدء السكان المستمر كل 2 ثانية
-        scanInterval = setInterval(async () => {
-            if (!isScanning) return;
-            
-            const ctx = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            // التقاط إطار من الفيديو
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            try {
-                // تنفيذ OCR على الإطار
-                const { data: { text } } = await ocrWorker.recognize(canvas);
-                
-                if (text && text.trim().length > 10) {
-                    let info = extractIDInfo(text);
-                    
-                    if (info.name || info.id) {
-                        let searchTerm = info.name ? info.name : info.id;
-                        document.getElementById('searchBox').value = searchTerm;
-                        search();
-                        
-                        // عرض إشعار بالنتيجة
-                        status.innerHTML = `✓ تم العثور على: ${info.name || 'غير واضح'}<br>الرقم القومي: ${info.id || 'غير واضح'}`;
-                        status.style.background = '#d4edda';
-                        status.style.borderColor = '#28a745';
-                    }
-                }
-            } catch (err) {
-                console.error('خطأ في OCR:', err);
-            }
-        }, 2000); // سكان كل ثانيتين
-
-    } catch (error) {
-        alert("فشل الوصول للكاميرا. تأكد من السماح للمتصفح باستخدام الكاميرا.");
-        console.error(error);
-    }
-}
-
-// إيقاف الكاميرا
-function stopCamera() {
-    isScanning = false;
-    
-    if (scanInterval) {
-        clearInterval(scanInterval);
-        scanInterval = null;
-    }
-    
-    if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
-        videoStream = null;
-    }
-    
-    const video = document.getElementById('videoPreview');
-    const status = document.getElementById('ocrStatus');
-    
-    video.style.display = 'none';
-    status.style.display = 'none';
-    video.srcObject = null;
-}
-
-// تنظيف عند إغلاق الصفحة
-window.addEventListener('beforeunload', () => {
-    stopCamera();
-    if (ocrWorker) {
-        ocrWorker.terminate();
-    }
-});
 </script>
-
 </body>
 </html>
