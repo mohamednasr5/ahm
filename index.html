@@ -23,8 +23,6 @@
             padding:15px;cursor:pointer;transition:.25s;}
         #micBtn.active {background:#ff9800;}
         #micStatus {margin-right:12px;color:#888;font-size:18px;}
-        
-        /* أيقونة الإدخال العائمة */
         #floatingInputBtn {
             position: fixed;
             top: 70px;
@@ -45,8 +43,6 @@
             transition:.2s;
         }
         #floatingInputBtn:hover {background: #1355af;}
-
-        /* نافذة إدخال البيانات (مخصص Modal) */
         #inputModal {
             display: none;
             position: fixed;left:0;top:0;width:100vw;height:100vh;
@@ -152,8 +148,6 @@ const inputModal = document.getElementById('inputModal');
 const modalCloseBtn = document.getElementById('modalClose');
 floatingInputBtn.onclick = function() { inputModal.style.display = 'flex'; }
 modalCloseBtn.onclick = function() { inputModal.style.display = 'none'; }
-
-// إغلاق النافذة بالضغط خارج المربع
 inputModal.addEventListener('click',function(e){
     if(e.target === inputModal) inputModal.style.display='none';
 });
@@ -162,6 +156,10 @@ inputModal.addEventListener('click',function(e){
 function fixNumbers(str) {
     const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
     return str.replace(/[٠-٩]/g, d => map[d]);
+}
+// توحيد الياء والألف المقصورة في البحث
+function normalizeName(str) {
+    return str.replace(/[يى]/g, "ى").replace(/\s+/g, " ").trim();
 }
 function extractNumberName(line) {
     line = fixNumbers(line).trim();
@@ -187,7 +185,7 @@ function loadData() {
         if (recs.length) voters.push(...recs);
     });
     alert("تم تحميل " + voters.length + " ناخب.");
-    inputModal.style.display = 'none'; // إغلاق النافذة العائمة بعد التحميل
+    inputModal.style.display = 'none';
     setTimeout(() => {document.getElementById('searchBox').focus();}, 200);
     search();
 }
@@ -196,9 +194,9 @@ function search() {
     let res = document.getElementById("results");
     res.innerHTML = "";
     if (!q) return;
-    // البحث محايد لمساحة بيضاء أو أخطاء نطقية طفيفة:
+    const normQ = normalizeName(q);
     const matched = voters.filter(v =>
-        v.name.includes(q) || v.number.includes(q)
+        normalizeName(v.name).includes(normQ) || v.number.includes(q)
     );
     matched.forEach(v => {
         const div = document.createElement("div");
@@ -233,7 +231,6 @@ try {
         micActive = true;
         document.getElementById('micBtn').classList.add('active');
         document.getElementById('micStatus').textContent = "يستمع...";
-        // يبدأ بحث جديد
         document.getElementById('searchBox').value = "";
         document.getElementById('results').innerHTML = "";
     };
