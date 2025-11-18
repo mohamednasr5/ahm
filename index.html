@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>كشوف الناخبين - لجنة 26 - مدرسة الأحمدية</title>
 
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.1/dist/tesseract.min.js"></script>
     <style>
         body {font-family: Arial, sans-serif; background:#f0f2f5; margin:0; padding:20px;}
         .container {max-width:1000px; margin:auto; background:white; padding:25px; border-radius:15px; box-shadow:0 6px 20px rgba(0,0,0,0.1);}
@@ -27,6 +28,16 @@
 
         .voter-name {font-size:20px; font-weight:bold;}
         .voter-serial {font-size:24px; font-weight:bold; color:#d32f2f;}
+
+        /* منطقة الكاميرا */
+        .camera-section {margin:20px 0; text-align:center;}
+        #videoPreview {width:100%; max-width:640px; border:3px solid #1877f2; border-radius:12px; display:none;}
+        #canvasOCR {display:none;}
+        .camera-controls {margin:15px 0;}
+        .camera-controls button {padding:12px 25px; margin:5px; border-radius:8px; border:none; color:white; font-size:16px; cursor:pointer;}
+        .btn-start {background:#4caf50;}
+        .btn-stop {background:#f44336;}
+        .ocr-status {margin:10px 0; padding:10px; background:#fff3cd; border-radius:8px; border:2px solid #ffc107; font-weight:bold;}
 
         /* البطاقة العائمة */
         .modal {display:none; position:fixed; left:0; top:0; width:100%; height:100%;
@@ -65,11 +76,7 @@
         /* الطباعة بحجم 5×2.5 سم */
         @media print {
             body * {visibility:hidden;}
-
-            #printArea, #printArea * {
-                visibility:visible;
-            }
-
+            #printArea, #printArea * {visibility:visible;}
             #printArea {
                 position:absolute;
                 left:0;
@@ -81,18 +88,15 @@
                 text-align:center;
                 border:1px solid #000;
             }
-
             @page {
                 size: 5cm 2.5cm;
                 margin:0;
             }
         }
     </style>
-
 </head>
 
 <body>
-
 <div class="container">
     <h1>لجنة 26</h1>
     <p class="subtitle">الصق النص الخام من PDF أو Word — النظام يستخرج كل ناخب تلقائيًا</p>
@@ -103,6 +107,19 @@
         <button onclick="loadData()" style="margin-top:10px; padding:12px 30px; background:#1877f2; color:white; border:none; border-radius:8px; cursor:pointer;">
             تحميل البيانات
         </button>
+    </div>
+
+    <!-- قسم الكاميرا المباشرة -->
+    <div class="camera-section">
+        <div class="camera-controls">
+            <button class="btn-start" onclick="startCamera()">تشغيل الكاميرا والسكان الفوري</button>
+            <button class="btn-stop" onclick="stopCamera()">إيقاف الكاميرا</button>
+        </div>
+        <div id="ocrStatus" class="ocr-status" style="display:none;">
+            جاري السكان المباشر... ضع البطاقة أمام الكاميرا
+        </div>
+        <video id="videoPreview" autoplay playsinline></video>
+        <canvas id="canvasOCR"></canvas>
     </div>
 
     <input type="text" id="searchBox" class="search-box" placeholder="ابحث بالاسم أو الرقم..." onkeyup="search()">
@@ -138,6 +155,10 @@
 
 <script>
 let voters = [];
+let videoStream = null;
+let isScanning = false;
+let ocrWorker = null;
+let scanInterval = null;
 
 // تحويل الأرقام العربية للهندية
 function fixNumbers(str) {
@@ -217,6 +238,121 @@ function showCard(v) {
 function printCard() {
     window.print();
 }
+
+// استخراج الرقم القومي والاسم من نص البطاقة
+function extractIDInfo(text) {
+    let idMatch = text.match(/(?:[12][0-9]{9}[0-9]{4})/);
+    let name = "";
+    let nameMatch = text.match(/الاسم[:\s]*([^\n\r]+)\n?/);
+    if (nameMatch && nameMatch[1].length > 7) name = nameMatch[1].trim();
+    if (!name && idMatch) {
+        let i = text.indexOf(idMatch[0]);
+        if (i > 0) {
+            let beforeID = text.slice(0, i).split('\n');
+            if (beforeID.length) name = beforeID[beforeID.length - 1].replace(/[^ \u0621-\u064a]/g, '').trim();
+        }
+    }
+    return {id: idMatch ? idMatch[0] : "", name};
+}
+
+// تشغيل الكاميرا والسكان الفوري
+async function startCamera() {
+    try {
+        const video = document.getElementById('videoPreview');
+        const canvas = document.getElementById('canvasOCR');
+        const status = document.getElementById('ocrStatus');
+        
+        // إيقاف أي كاميرا سابقة
+        if (videoStream) {
+            stopCamera();
+        }
+
+        // طلب الوصول للكاميرا الخلفية
+        videoStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+            audio: false
+        });
+
+        video.srcObject = videoStream;
+        video.style.display = 'block';
+        status.style.display = 'block';
+        
+        // تهيئة Tesseract Worker
+        if (!ocrWorker) {
+            ocrWorker = await Tesseract.createWorker('ara');
+        }
+
+        isScanning = true;
+
+        // بدء السكان المستمر كل 2 ثانية
+        scanInterval = setInterval(async () => {
+            if (!isScanning) return;
+            
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // التقاط إطار من الفيديو
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            try {
+                // تنفيذ OCR على الإطار
+                const { data: { text } } = await ocrWorker.recognize(canvas);
+                
+                if (text && text.trim().length > 10) {
+                    let info = extractIDInfo(text);
+                    
+                    if (info.name || info.id) {
+                        let searchTerm = info.name ? info.name : info.id;
+                        document.getElementById('searchBox').value = searchTerm;
+                        search();
+                        
+                        // عرض إشعار بالنتيجة
+                        status.innerHTML = `✓ تم العثور على: ${info.name || 'غير واضح'}<br>الرقم القومي: ${info.id || 'غير واضح'}`;
+                        status.style.background = '#d4edda';
+                        status.style.borderColor = '#28a745';
+                    }
+                }
+            } catch (err) {
+                console.error('خطأ في OCR:', err);
+            }
+        }, 2000); // سكان كل ثانيتين
+
+    } catch (error) {
+        alert("فشل الوصول للكاميرا. تأكد من السماح للمتصفح باستخدام الكاميرا.");
+        console.error(error);
+    }
+}
+
+// إيقاف الكاميرا
+function stopCamera() {
+    isScanning = false;
+    
+    if (scanInterval) {
+        clearInterval(scanInterval);
+        scanInterval = null;
+    }
+    
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+    }
+    
+    const video = document.getElementById('videoPreview');
+    const status = document.getElementById('ocrStatus');
+    
+    video.style.display = 'none';
+    status.style.display = 'none';
+    video.srcObject = null;
+}
+
+// تنظيف عند إغلاق الصفحة
+window.addEventListener('beforeunload', () => {
+    stopCamera();
+    if (ocrWorker) {
+        ocrWorker.terminate();
+    }
+});
 </script>
 
 </body>
