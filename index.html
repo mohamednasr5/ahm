@@ -173,6 +173,7 @@ h1 {
         <div style="display:flex; gap:10px;">
             <button onclick="loadData()">تحميل البيانات</button>
             <button onclick="getFromUrl()">جلب من رابط</button>
+            <button onclick="fetchAndLoadUrl(prompt('اكتب رابط الملف التحميل المباشر:'))">تحديث مباشر من رابط</button>
             <button id="modalClose">إغلاق</button>
         </div>
         <div style="color:#b99;font-size:12px; margin-top:12px; text-align:center;">
@@ -194,14 +195,19 @@ h1 {
 <script>
 const AUTOLOAD_URL = "https://raw.githubusercontent.com/mohamednasr5/ahm/refs/heads/main/00.txt";
 window.addEventListener('DOMContentLoaded', () => {
-    fetch(AUTOLOAD_URL)
-        .then(resp => resp.ok ? resp.text() : Promise.reject())
-        .then(text => {
-            document.getElementById('textInput').value = text.trim();
-            loadData();
-            updateDotStatus();
-        });
+    fetchAndLoadUrl(AUTOLOAD_URL);
 });
+function fetchAndLoadUrl(url){
+    if(!url) return;
+    fetch(url)
+    .then(resp => resp.ok ? resp.text() : Promise.reject("خطأ في جلب النص"))
+    .then(text => {
+        document.getElementById('textInput').value = text.trim();
+        loadData();
+        updateDotStatus();
+    })
+    .catch(()=>alert("تعذر جلب النص من الرابط!"));
+}
 let voters = [];
 const floatingInputBtn = document.getElementById('floatingInputBtn');
 const inputModal = document.getElementById('inputModal');
@@ -241,28 +247,23 @@ function fixNumbers(str) {
 function normalizeName(str) {
     return str.replace(/[يى]/g, "ى").replace(/\s+/g, " ").trim();
 }
-// تطابق متقدم: يراعي الاسم الأول أو الثاني أو الأخير أو أي جزء، ويستخدم levenshtein
 function isApproxMatch(queryArr, nameArr) {
-    // يطابق إذا وجد كل الكلمات (كل كلمة أو تقريب levenshtein<=2) في الترتيب، ويسمح بإغفال كلمة واحدة
     let qLen = queryArr.length, nLen = nameArr.length;
     if(qLen<=1) return false;
-    // فحص مطابقة متتالية لأي مجموعة بنفس العدد من الكلمات داخل nameArr
     for(let start=0;start<=nLen-qLen;start++){
         let match = true;
         for(let i=0;i<qLen;i++) {
             let d = levenshtein(queryArr[i], nameArr[start+i]);
             if (d > 2) {match=false; break;}
         }
-        if(match) return true; // طابق كل الكلمات متتالية
+        if(match) return true;
     }
-    // طابق كـ (اسم أول + اسم ثاني + اسم أخير): كل كلمة من البحث ضمن nameArr (بترتيب أو بفارق بسيط)
     let last = queryArr[qLen-1], first = queryArr[0];
     let hasFirst = nameArr.some(w=>levenshtein(w,first)<=2);
     let hasLast = nameArr.some(w=>levenshtein(w,last)<=2);
     if(qLen>=2 && hasFirst && hasLast) {
         let middleMatched = true;
         if(qLen>2) {
-            // الكلمات الوسطى لو موجودة
             for(let i=1;i<qLen-1;i++) {
                 if(!nameArr.some(w=>levenshtein(w,queryArr[i])<=2)) {middleMatched=false;break;}
             }
@@ -321,10 +322,8 @@ function search() {
     if (!q) return;
     const normQ = normalizeName(q);
     const qArr = normQ.split(" ").filter(Boolean);
-    // البحث متقدم
     const scored = voters.map(v => {
         const nArr = normalizeName(v.name).split(" ").filter(Boolean);
-        // خاصية المطابقة الثلاثية/المتقدمة:
         let score = 4; // default worst
         if(isApproxMatch(qArr,nArr)) score = 0;
         else score = levenshtein(normQ, normalizeName(v.name));
@@ -363,7 +362,6 @@ function speakNumber(num) {
         window.speechSynthesis.speak(utter);
     }
 }
-/* ميكروفون أسرع: فقط النطق النهائي، النظام أسرع استجابة! */
 let recognition;
 let micActive = false;
 try {
