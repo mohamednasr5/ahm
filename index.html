@@ -4,90 +4,97 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>كشوف الناخبين - لجنة 26 - مدرسة الأحمدية</title>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.1/dist/tesseract.min.js"></script>
-
     <style>
         body {font-family: Arial, sans-serif; background:#f0f2f5; margin:0; padding:20px;}
         .container {max-width:1000px; margin:auto; background:white; padding:25px; border-radius:15px; box-shadow:0 6px 20px rgba(0,0,0,0.1);}
         h1 {text-align:center; margin-bottom:5px; color:#1877f2;}
         .subtitle {text-align:center; color:#444; margin-bottom:20px; font-size:18px;}
-
-        .upload-area {border:3px dashed #1877f2; padding:30px; text-align:center; border-radius:15px; background:#f8f9fa; margin-top:20px;}
-        textarea {width:100%; height:260px; padding:12px; font-size:16px; border-radius:8px; border:2px solid #ccc;}
-
         .search-box {width:100%; padding:16px; font-size:22px; border-radius:50px;
             border:3px solid #1877f2; margin:20px 0 0 0; text-align:center;}
-
         .results {margin-top:20px; max-height:500px; overflow-y:auto;}
-
         .voter-item {
             background:#fff; padding:15px; border-right:6px solid #28a745; border-radius:12px;
-            margin:10px 0; cursor:pointer; transition:.25s; box-shadow:0 3px 10px rgba(0,0,0,0.08);
-        }
+            margin:10px 0; cursor:pointer; transition:.25s; box-shadow:0 3px 10px rgba(0,0,0,0.08);}
         .voter-item:hover {background:#e8f5e8; transform:translateX(-6px);}
         .voter-name {font-size:20px; font-weight:bold;}
         .voter-serial {font-size:24px; font-weight:bold; color:#d32f2f;}
-
-        /* ميكروفون صوتي */
         .mic-section {text-align:center; margin:0 0 14px 0;}
         #micBtn {font-size:24px;border:none;border-radius:50%;background:#ffc107;color:#222;
             padding:15px;cursor:pointer;transition:.25s;}
         #micBtn.active {background:#ff9800;}
         #micStatus {margin-right:12px;color:#888;font-size:18px;}
+        
+        /* أيقونة الإدخال العائمة */
+        #floatingInputBtn {
+            position: fixed;
+            top: 70px;
+            left: 24px;
+            z-index: 9999;
+            background: #1877f2;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 58px;
+            height: 58px;
+            font-size: 32px;
+            box-shadow:0 3px 12px rgba(0,0,0,0.17);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition:.2s;
+        }
+        #floatingInputBtn:hover {background: #1355af;}
+
+        /* نافذة إدخال البيانات (مخصص Modal) */
+        #inputModal {
+            display: none;
+            position: fixed;left:0;top:0;width:100vw;height:100vh;
+            background: rgba(0,0,0,0.22);z-index:10001;
+            align-items: center;justify-content: center;
+        }
+        #inputModalBox {
+            background: white;
+            padding: 28px 18px 10px 18px;
+            border-radius: 12px;
+            max-width:420px;
+            min-width:260px;
+            width:96vw;
+            box-shadow:0 3px 24px rgba(0,0,0,0.19);
+            display: flex;flex-direction: column;align-items: center;
+        }
+        #inputModalBox textarea {width:100%; min-height:180px; border-radius:8px; border:2px solid #1877f2; font-size:16px; margin-bottom:16px; padding:10px;}
+        #inputModalBox button {
+            background: #1877f2; color: white;
+            border:none; font-size: 18px; padding:10px 40px; border-radius:9px;margin:6px 2px;
+            cursor:pointer;margin-bottom:3px;
+        }
+        #inputModalBox button#modalClose {background:#d32f2f;}
+        @media (max-width: 700px) {
+          #inputModalBox {min-width:60vw;}
+        }
 
         /* البطاقة العائمة */
         .modal {display:none; position:fixed; left:0; top:0; width:100%; height:100%;
             background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center;}
-
         .card {width:380px; background:white; border-radius:18px; overflow:hidden;
             box-shadow:0 10px 30px rgba(0,0,0,0.5);}
-
         .card-header {background:#0d47a1; color:white; padding:18px; text-align:center;
             font-size:26px; font-weight:bold;}
-
         .voter-fullname {background:#e3f2fd; padding:20px; margin:15px;
             border-right:6px solid #1976d2; font-size:22px; font-weight:bold;}
-
-        .big-serial {
-            margin: 10px 15px;
-            font-size: 32px;
-            font-weight: 900;
-            color: #c62828;
-            text-align:center;
-            border-right:6px solid #d32f2f;
-            background:#ffebee;
-            padding:15px;
-            border-radius:12px;
-        }
-
-        .committee-box {background:#e8eaf6; padding:18px; margin:15px;
-            border-right:6px solid #3f51b5; font-size:26px; font-weight:bold;}
-
-        .place-box {background:#e8f5e9; padding:18px; margin:15px;
-            border-right:6px solid #4caf50; font-size:22px;}
-
+        .big-serial {margin: 10px 15px; font-size: 32px; font-weight: 900; color: #c62828;
+            text-align:center; border-right:6px solid #d32f2f; background:#ffebee; padding:15px; border-radius:12px;}
+        .committee-box {background:#e8eaf6; padding:18px; margin:15px; border-right:6px solid #3f51b5; font-size:26px; font-weight:bold;}
+        .place-box {background:#e8f5e9; padding:18px; margin:15px; border-right:6px solid #4caf50; font-size:22px;}
         .print-btn {background:#d32f2f; color:white; border:none; width:80%; padding:14px;
             margin:20px auto; border-radius:40px; font-size:22px; cursor:pointer;}
-
-        /* الطباعة بحجم 5×2.5 سم */
         @media print {
             body * {visibility:hidden;}
             #printArea, #printArea * {visibility:visible;}
-            #printArea {
-                position:absolute;
-                left:0;
-                top:0;
-                width:5cm;
-                height:2.5cm;
-                background:white;
-                padding-top:0.6cm;
-                text-align:center;
-                border:1px solid #000;
-            }
-            @page {
-                size: 5cm 2.5cm;
-                margin:0;
-            }
+            #printArea {position:absolute;left:0;top:0;width:5cm;height:2.5cm;background:white;
+                padding-top:0.6cm;text-align:center; border:1px solid #000;}
+            @page {size: 5cm 2.5cm;margin:0;}
         }
     </style>
 </head>
@@ -95,24 +102,30 @@
 <body>
 <div class="container">
     <h1>لجنة 26</h1>
-    <p class="subtitle">الصق النص الخام من PDF أو Word — النظام يستخرج كل ناخب تلقائيًا</p>
-
-    <div class="upload-area">
-        <p>الصق النص هنا كما هو من PDF أو Word</p>
-        <textarea id="textInput" placeholder="مثال: ١ ابتسام ... ٢ ابتسام ... ٣ ... في نفس السطر أو سطور متعددة"></textarea>
-        <button onclick="loadData()" style="margin-top:10px; padding:12px 30px; background:#1877f2; color:white; border:none; border-radius:8px; cursor:pointer;">
-            تحميل البيانات
-        </button>
-    </div>
-
-    <!-- زر ميكروفون صوتي -->
+    <p class="subtitle">ابحث بالصوت أو أدخل أسماء الناخبين - النظام يعرض النتائج فورياً</p>
     <div class="mic-section">
         <button id="micBtn" title="بحث صوتي">🎤</button>
         <span id="micStatus"></span>
     </div>
-
     <input type="text" id="searchBox" class="search-box" placeholder="ابحث بالاسم أو الرقم..." onkeyup="search()">
     <div id="results" class="results"></div>
+</div>
+
+<!-- زر الإدخال العائم -->
+<button id="floatingInputBtn" title="إدخال أو تحديث بيانات">
+    📋
+</button>
+
+<!-- نافذة الإدخال المتحركة -->
+<div id="inputModal">
+    <div id="inputModalBox">
+        <h3 style="color:#1877f2;margin-bottom:8px;">إدخال/تحديث بيانات الناخبين</h3>
+        <textarea id="textInput" placeholder="مثال: ١ ابتسام ... ٢ ابتسام ... ٣ ... في نفس السطر أو سطور متعددة"></textarea>
+        <div style="display:flex; gap:10px;">
+            <button onclick="loadData()">تحميل البيانات</button>
+            <button id="modalClose">إغلاق</button>
+        </div>
+    </div>
 </div>
 
 <!-- البطاقة -->
@@ -126,46 +139,44 @@
         <button class="print-btn" onclick="printCard()">طباعة</button>
     </div>
 </div>
-
-<!-- جزء الطباعة فقط -->
 <div id="printArea" style="display:none;">
-    <div id="pSerialOnly" style="
-        font-size:28px;
-        font-weight:bold;
-        text-align:center;
-        margin-top:4px;
-    "></div>
+    <div id="pSerialOnly" style="font-size:28px;font-weight:bold;text-align:center;margin-top:4px;"></div>
 </div>
 
 <script>
 let voters = [];
+
+// أزرار وإجراءات نافذة الإدخال العائمة
+const floatingInputBtn = document.getElementById('floatingInputBtn');
+const inputModal = document.getElementById('inputModal');
+const modalCloseBtn = document.getElementById('modalClose');
+floatingInputBtn.onclick = function() { inputModal.style.display = 'flex'; }
+modalCloseBtn.onclick = function() { inputModal.style.display = 'none'; }
+
+// إغلاق النافذة بالضغط خارج المربع
+inputModal.addEventListener('click',function(e){
+    if(e.target === inputModal) inputModal.style.display='none';
+});
 
 // تحويل الأرقام العربية للهندية
 function fixNumbers(str) {
     const map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
     return str.replace(/[٠-٩]/g, d => map[d]);
 }
-
-// استخراج كل (رقم + اسم) من السطر الواحد
 function extractNumberName(line) {
     line = fixNumbers(line).trim();
     if (!line) return [];
-
     if (line.includes("مسلسل السم")) return [];
     if (/^\d+\s+من\s+\d+/.test(line)) return [];
     if (line.includes("رقم اللجنة")) return [];
-
     let regex = /(\d{1,5})\s+([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+)*)(?=\s+\d{1,5}\b|$)/g;
     let matches = [...line.matchAll(regex)];
     if (!matches.length) return [];
-
     return matches.map(m => ({
         number: m[1],
         name: m[2].trim()
     }));
 }
-
-// تحميل النص كامل
 function loadData() {
     const text = document.getElementById("textInput").value.trim();
     if (!text) { alert("أدخل النص أولاً!"); return; }
@@ -176,14 +187,16 @@ function loadData() {
         if (recs.length) voters.push(...recs);
     });
     alert("تم تحميل " + voters.length + " ناخب.");
+    inputModal.style.display = 'none'; // إغلاق النافذة العائمة بعد التحميل
+    setTimeout(() => {document.getElementById('searchBox').focus();}, 200);
     search();
 }
-
-// البحث وعرض النتائج
 function search() {
     let q = document.getElementById("searchBox").value.trim();
     let res = document.getElementById("results");
     res.innerHTML = "";
+    if (!q) return;
+    // البحث محايد لمساحة بيضاء أو أخطاء نطقية طفيفة:
     const matched = voters.filter(v =>
         v.name.includes(q) || v.number.includes(q)
     );
@@ -198,19 +211,13 @@ function search() {
         res.appendChild(div);
     });
 }
-
-// فتح البطاقة العائمة
 function showCard(v) {
     document.getElementById("mName").textContent = v.name;
     document.getElementById("mSerial").textContent = "رقم الكشف: " + v.number;
     document.getElementById("pSerialOnly").textContent = v.number;
     document.getElementById("modal").style.display = "flex";
 }
-
-// الطباعة
-function printCard() {
-    window.print();
-}
+function printCard() {window.print();}
 
 /* البحث الصوتي */
 let recognition;
@@ -226,6 +233,9 @@ try {
         micActive = true;
         document.getElementById('micBtn').classList.add('active');
         document.getElementById('micStatus').textContent = "يستمع...";
+        // يبدأ بحث جديد
+        document.getElementById('searchBox').value = "";
+        document.getElementById('results').innerHTML = "";
     };
     recognition.onresult = (event) => {
         micActive = false;
